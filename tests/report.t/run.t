@@ -52,3 +52,14 @@ A directory without any report is reported on stderr:
 
   $ ../crapper.exe --no-coverage . | grep complex
   complex                        Foo                                    8     N/A      N/A
+
+Modules can be ignored from the output, submodules included:
+
+  $ ../crapper.exe --no-coverage --ignore-modules Foo.Inner,Foo.counter . | grep Foo.Bar
+  mul                            Foo.Bar                                1     N/A      N/A
+
+  $ ../crapper.exe --no-coverage --ignore-modules Foo.Inner,Foo.counter . | grep -E "twice|bump|get" | wc -l
+  0
+
+  $ ../crapper.exe --no-coverage --ignore-modules Foo . | grep -c "N/A" || true
+  0

@@ -7,10 +7,29 @@ let run_coverage = ref false
 let no_match_cases = ref false
 let threshold = ref None
 let min_crap = ref None
+let ignore_modules = ref []
 let coverage_command = ref None
 let coverage_path = ref None
 let roots = ref []
 let usage = "usage: crapper [options] [files-or-dirs]"
+
+(* A module pattern ignores the module itself and everything inside it:
+   [Foo] covers [Foo.Bar.baz], but not [Foobar] *)
+let rec first_n n = function
+  | [] -> []
+  | x :: tl -> if n <= 0 then [] else x :: first_n (n - 1) tl
+;;
+
+let ignores_module ignored (e : Model.entry) =
+  let components s = String.split_on_char '.' s in
+  List.exists
+    (fun pattern ->
+      let pattern = components (String.trim pattern) in
+      let namespace = components e.Model.namespace in
+      List.length pattern <= List.length namespace
+      && List.for_all2 String.equal pattern (first_n (List.length pattern) namespace))
+    ignored
+;;
 
 let () =
   let anon arg = roots := arg :: !roots in
@@ -32,6 +51,14 @@ let () =
          , Arg.Float (fun f -> min_crap := Some f)
          , "N omit functions with a CRAP score lower than N; N/A rows\n\
            \        are dropped as well" )
+       ; ( "--ignore-modules"
+         , Arg.String
+             (fun s ->
+               ignore_modules
+               := String.split_on_char ',' s
+                  |> List.map String.trim
+                  |> List.filter (fun s -> s <> ""))
+         , "M1,M2 omit the functions of these modules and\n        their submodules" )
        ; ( "--coverage-path"
          , Arg.String (fun s -> coverage_path := Some s)
          , "DIR read .coverage files from this directory instead of\n\
@@ -109,6 +136,11 @@ let () =
             | Some c when c >= min -> true
             | _ -> false)
           entries
+    in
+    let entries =
+      if !ignore_modules = []
+      then entries
+      else List.filter (fun e -> not (ignores_module !ignore_modules e)) entries
     in
     print_endline (Crapper_ml.Report.format_report entries);
     (* exit 2 when the worst score is higher than the threshold *)

@@ -93,7 +93,8 @@ loops                          Foo                                    3  100.0% 
 
 Rows without a score follow scored rows, ordered by descending complexity.
 `--min-crap N` omits functions with a lower score; N/A rows are dropped as
-well. `--threshold N` exits with code 2 when the worst score is higher.
+well. `--ignore-modules Foo,Foo.Bar` omits the functions of the named
+modules and their submodules. `--threshold N` exits with code 2 when the worst score is higher.
 
 ## Development
 
