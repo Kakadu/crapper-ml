@@ -13,7 +13,7 @@ everything is N/A:
 
 The user runs the coverage explicitly:
 
-  $ ../../crapper.exe --run-coverage .
+  $ ../../crapper.exe --coverage-command 'dune runtest --instrument-with bisect_ppx_ng --sandbox=none' .
   CRAP Report
   ===========
   Languages: OCaml

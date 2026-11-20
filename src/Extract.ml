@@ -125,6 +125,25 @@ let rec pat_name (pat : Ppxlib.Parsetree.pattern) =
   | _ -> None
 ;;
 
+(* Whether the binding's expression is a function. The AST shape depends
+   on the ppxlib version: up to 0.35 the lowest supported AST still had
+   [Pexp_fun]; from 0.36 on (OCaml 5.2 shape) [fun] and [function] are
+   merged into [Pexp_function]. The compiler version is used as a proxy
+   for the switches in use. *)
+[%%if ocaml_version < (5, 4, 0)]
+let is_function_expr (e : Ppxlib.Parsetree.expression) =
+  match e.Ppxlib.Parsetree.pexp_desc with
+  | Pexp_function _ | Pexp_fun _ -> true
+  | _ -> false
+;;
+[%%else]
+let is_function_expr (e : Ppxlib.Parsetree.expression) =
+  match e.Ppxlib.Parsetree.pexp_desc with
+  | Pexp_function _ -> true
+  | _ -> false
+;;
+[%%endif]
+
 let span_of_location (loc : Ppxlib.Location.t) =
   ( loc.Ppxlib.Location.loc_start.Lexing.pos_lnum
   , loc.Ppxlib.Location.loc_end.Lexing.pos_lnum
@@ -205,14 +224,13 @@ and add_value_binding namespace ~count_cases vb acc =
 
 and add_value_binding_instrumented namespace ~count_cases vb acc =
   let expr = vb.Ppxlib.Parsetree.pvb_expr in
-  match expr.Ppxlib.Parsetree.pexp_desc with
-  | Pexp_function _ | Pexp_fun _ ->
-    (match pat_name vb.Ppxlib.Parsetree.pvb_pat with
+  if not (is_function_expr expr)
+  then acc
+  else (match pat_name vb.Ppxlib.Parsetree.pvb_pat with
      | Some name ->
        make_function ~name ~namespace ~loc:vb.Ppxlib.Parsetree.pvb_loc ~count_cases ~expr
        :: acc
      | None -> acc)
-  | _ -> acc
 
 and add_class namespace ~count_cases cd acc =
   let namespace = namespace ^ "." ^ cd.Ppxlib.Parsetree.pci_name.Location.txt in

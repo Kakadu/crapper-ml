@@ -2,4 +2,4 @@
  (name cm)
  (modules cm)
  (instrumentation
-  (backend bisect_ppx)))
+  (backend bisect_ppx_ng)))

@@ -1,13 +1,14 @@
 The same code twice: [complex] is never called by the test, [complex_copy]
 is fully exercised. Identical complexity, very different CRAP scores.
 
+  $ cd fixture
   $ dune build
 
-  $ ../crapper.exe . | grep complex
+  $ ../../crapper.exe . | grep complex
   complex                        Cm                                     8     N/A      N/A
   complex_copy                   Cm                                     8     N/A      N/A
 
-  $ ../crapper.exe --run-coverage .
+  $ ../../crapper.exe --run-coverage .
   CRAP Report
   ===========
   Languages: OCaml
@@ -16,6 +17,8 @@ is fully exercised. Identical complexity, very different CRAP scores.
   ----------------------------------------------------------------------------------------
   complex                        Cm                                     8    0.0%     72.0
   complex_copy                   Cm                                     8   90.0%      8.1
+  $ find .metrics -name '*.coverage' | wc -l
+  $ find . -name '*.coverage' | wc -l
   
 
 With --no-match-cases the match cases are not counted; the same code
@@ -24,7 +27,7 @@ scores lower everywhere and the metric can no longer tell a two-path
 
 Rows below a requested score can be omitted; N/A rows follow them out:
 
-  $ ../crapper.exe --min-crap 30 .
+  $ ../../crapper.exe --min-crap 30 .
   CRAP Report
   ===========
   Languages: OCaml
@@ -34,13 +37,13 @@ Rows below a requested score can be omitted; N/A rows follow them out:
   complex                        Cm                                     8    0.0%     72.0
   
 
-  $ ../crapper.exe --min-crap 100 .
+  $ ../../crapper.exe --min-crap 100 .
   CRAP Report
   ===========
   Function                       Module                                CC    Cov%     CRAP
   ----------------------------------------------------------------------------------------
   
 
-  $ ../crapper.exe --no-match-cases . | grep complex
+  $ ../../crapper.exe --no-match-cases . | grep complex
   complex                        Cm                                     5    0.0%     30.0
   complex_copy                   Cm                                     5   90.0%      5.0

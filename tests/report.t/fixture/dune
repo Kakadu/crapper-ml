@@ -1,4 +1,4 @@
 (library
  (name foo)
  (instrumentation
-  (backend bisect_ppx)))
+  (backend bisect_ppx_ng)))

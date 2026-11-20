@@ -119,6 +119,38 @@ let rec collect_under path acc =
   else acc
 ;;
 
+(* Newer dunes sandbox test actions, so the bisect runtime's writes to an
+   absolute BISECT_FILE path may be swallowed; files written into the test
+   working directory are promoted back into the source tree instead. After
+   a run, sweep the tree for them and move them into the run directory. *)
+let sweep_into run_dir =
+  let skip name =
+    (* [._build] is scanned too: test actions run inside it and dune 3.24
+       sandboxes writes to absolute paths outside it *)
+    List.mem name [ ".git"; ".hg"; ".metrics"; "node_modules"; "_opam" ]
+    || (String.starts_with ~prefix:"." name && not (Filename.check_suffix name ".coverage"))
+  in
+  let counter = ref 0 in
+  let rec walk path =
+    if Sys.file_exists path && Sys.is_directory path
+    then (
+      let base = Filename.basename path in
+      if base <> path && skip base
+      then ()
+      else
+        Array.iter
+          (fun name -> walk (Filename.concat path name))
+          (Sys.readdir path))
+    else if Filename.check_suffix (Filename.basename path) ".coverage"
+    then (
+      incr counter;
+      let target = Printf.sprintf "%s/collected_%04d.coverage" run_dir !counter in
+      (try Sys.rename path target with
+       | Sys_error msg -> prerr_endline ("crapper: " ^ msg)))
+  in
+  walk "."
+;;
+
 let read_file path =
   let ic = open_in_bin path in
   let n = in_channel_length ic in
@@ -172,7 +204,10 @@ let coverage_of (f : Model.function_) (data : data) =
    test only when its sources changed, and a fresh run directory marks which
    data is current. *)
 let coverage_dir = ".metrics/coverage"
-let default_coverage_command = "dune runtest --instrument-with bisect_ppx"
+(* [--sandbox=none] so that the instrumented test processes can write the
+   coverage data where BISECT_FILE points: newer dunes sandbox test actions
+   and silently swallow writes to absolute paths outside them *)
+let default_coverage_command = "dune runtest --instrument-with bisect_ppx_ng --sandbox=none"
 
 (* Number of run directories kept on disk *)
 let keep_runs = 3
@@ -244,13 +279,14 @@ let execute_into dir = function
   | None -> ()
   | Some command ->
     ensure_dir dir;
-    (* absolute: test processes run inside dune's sandbox directories *)
-    let bisect_prefix = Filename.concat (Sys.getcwd ()) dir in
-    let cmd =
-      Printf.sprintf "BISECT_FILE=%s/bisect %s" (Filename.quote bisect_prefix) command
-    in
+    (* No BISECT_FILE: newer dunes sandbox test actions and swallow writes to
+       absolute paths outside them. The runtime instead writes
+       [bisect*.coverage] into the test working directory, which dune
+       promotes back into the source tree; sweep_into collects them. *)
+    let cmd = Printf.sprintf "%s" command in
     if Sys.command cmd <> 0
-    then prerr_endline "crapper: coverage command failed; functions are scored at 0%"
+    then prerr_endline "crapper: coverage command failed; functions are scored at 0%";
+    sweep_into dir
 ;;
 
 (* [run] executes the coverage command; without it the existing reports are
