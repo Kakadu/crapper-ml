@@ -13,6 +13,7 @@
 
 (executable
  (name main)
+ (public_name crapper-ml)
  (modules main)
  (libraries crapper_ml)
  (instrumentation

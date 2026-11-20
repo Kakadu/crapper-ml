@@ -1,6 +1,7 @@
 # crapper
 
-CRAP scores for OCaml. One run discovers the compiled modules of a dune
+CRAP scores for OCaml.
+One run discovers the compiled modules of a dune
 project, applies the language's complexity and coverage rules, and prints the
 report.
 
@@ -14,8 +15,9 @@ CRAP = CC² × (1 − coverage)³ + CC
 ```
 
 `CC` is cyclomatic complexity. `coverage` is the fraction of the function
-exercised by tests. A score of 1–5 is low risk, 5–30 is worth a look, and 30+
-is complex and under-tested.
+exercised by tests.
+
+The tools mostly is LLM-generated.
 
 ## Run
 
