@@ -76,6 +76,16 @@ let coverage_state = ref true
    does not instrument. Omitted by default. *)
 let omit_uninstrumented = ref true
 
+(* The name of the [off] / [on] payload expression of a [@coverage ...]
+   marker. Both identifier and constructor shapes are accepted, so the
+   check works on every AST version ppxlib migrates to. *)
+let marker_name (e : Ppxlib.Parsetree.expression) =
+  match e.Ppxlib.Parsetree.pexp_desc with
+  | Pexp_ident { txt = Lident name; _ }
+  | Pexp_construct ({ txt = Lident name; _ }, None) -> Some name
+  | _ -> None
+;;
+
 (* The [off] / [on] argument of a [@coverage ...] marker, if any *)
 let coverage_flag (attrs : Ppxlib.Parsetree.attributes) =
   List.find_map
@@ -84,9 +94,9 @@ let coverage_flag (attrs : Ppxlib.Parsetree.attributes) =
       | "coverage" ->
         (match attr.attr_payload with
          | PStr [ { pstr_desc = Pstr_eval (e, _); _ } ] ->
-           (match e.Ppxlib.Parsetree.pexp_desc with
-            | Pexp_ident { txt = Lident "off"; _ } -> Some false
-            | Pexp_ident { txt = Lident "on"; _ } -> Some true
+           (match marker_name e with
+            | Some "off" -> Some false
+            | Some "on" -> Some true
             | _ -> None)
          | _ -> None)
       | _ -> None)
@@ -102,7 +112,7 @@ let update_coverage_state (attrs : Ppxlib.Parsetree.attributes) =
 let instrumented binding_attrs binding_expr =
   !coverage_state
   && coverage_flag binding_attrs <> Some false
-  && coverage_flag binding_expr.Parsetree.pexp_attributes <> Some false
+  && coverage_flag binding_expr.Ppxlib.Parsetree.pexp_attributes <> Some false
 ;;
 
 (* The pattern of a [let] binding names the function: [f] in [let f x = ...],
