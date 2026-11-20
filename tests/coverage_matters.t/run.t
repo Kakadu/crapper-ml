@@ -22,6 +22,24 @@ With --no-match-cases the match cases are not counted; the same code
 scores lower everywhere and the metric can no longer tell a two-path
 [try] from straight-line code:
 
+Rows below a requested score can be omitted; N/A rows follow them out:
+
+  $ ../crapper.exe --min-crap 30 .
+  CRAP Report
+  ===========
+  Languages: ocaml
+  
+  Function                       Namespace                             CC    Cov%     CRAP
+  ----------------------------------------------------------------------------------------
+  complex                        Cm                                     8    0.0%     72.0
+  
+
+  $ ../crapper.exe --min-crap 100 .
+  CRAP Report
+  ===========
+  Function                       Namespace                             CC    Cov%     CRAP
+  ----------------------------------------------------------------------------------------
+
   $ ../crapper.exe --no-match-cases . | grep complex
   complex                        Cm                                     5    0.0%     30.0
   complex_copy                   Cm                                     5   90.0%      5.0

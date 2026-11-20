@@ -6,6 +6,7 @@ let no_coverage = ref false
 let run_coverage = ref false
 let no_match_cases = ref false
 let threshold = ref None
+let min_crap = ref None
 let coverage_command = ref None
 let coverage_path = ref None
 let roots = ref []
@@ -27,6 +28,10 @@ let () =
                coverage_command := Some s;
                run_coverage := true)
          , "CMD run this coverage command before analyzing" )
+       ; ( "--min-crap"
+         , Arg.Float (fun f -> min_crap := Some f)
+         , "N omit functions with a CRAP score lower than N; N/A rows\n\
+           \        are dropped as well" )
        ; ( "--coverage-path"
          , Arg.String (fun s -> coverage_path := Some s)
          , "DIR read .coverage files from this directory instead of\n\
@@ -91,6 +96,19 @@ let () =
       functions
       |> List.map (fun f -> Crap.make_entry ~coverage:(coverage_of f) f)
       |> Crap.sort_entries
+    in
+    (* Rows below the requested score are omitted; N/A rows cannot be
+       compared and follow them out of the report *)
+    let entries =
+      match !min_crap with
+      | None -> entries
+      | Some min ->
+        List.filter
+          (fun e ->
+            match e.Model.crap with
+            | Some c when c >= min -> true
+            | _ -> false)
+          entries
     in
     print_endline (Crapper_ml.Report.format_report entries);
     (* exit 2 when the worst score is higher than the threshold *)

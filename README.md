@@ -92,7 +92,8 @@ loops                          Foo                                    3  100.0% 
 ```
 
 Rows without a score follow scored rows, ordered by descending complexity.
-`--threshold N` exits with code 2 when the worst score is higher.
+`--min-crap N` omits functions with a lower score; N/A rows are dropped as
+well. `--threshold N` exits with code 2 when the worst score is higher.
 
 ## Development
 
