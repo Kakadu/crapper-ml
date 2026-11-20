@@ -222,12 +222,13 @@ let merge_newest (runs : data list) : data =
   Hashtbl.fold (fun filename points acc -> (filename, points) :: acc) per_file []
 ;;
 
-let load ~use_existing ~command =
+(* [run] executes the coverage command into a fresh run directory; without it
+   the existing reports are used as they are. *)
+let load ~run ~command =
   let dirs = run_dirs coverage_dir in
   let dirs =
-    if use_existing
-    then dirs
-    else (
+    match run, command with
+    | true, Some command ->
       ensure_dir coverage_dir;
       let n =
         match dirs with
@@ -246,7 +247,8 @@ let load ~use_existing ~command =
       in
       if Sys.command cmd <> 0
       then prerr_endline "crapper: coverage command failed; functions are scored at 0%";
-      new_dir :: dirs)
+      new_dir :: dirs
+    | _ -> dirs
   in
   (* [.coverage] files left directly in the coverage directory by older
      versions are the oldest data *)
@@ -254,33 +256,10 @@ let load ~use_existing ~command =
     collect coverage_dir |> List.map (fun path -> parse_file (read_file path)) |> merge
   in
   let runs = dirs |> List.map parse_run in
-  let merge_runs runs =
-    match runs with
-    | [] -> []
-    | newest :: older -> merge_newest (newest :: (older @ [ legacy ]))
-  in
   let data =
-    (* When nothing was rerun (a warm instrumented build and no coverage data
-       on disk), force one full instrumented test run *)
-    if
-      (not use_existing)
-      && List.for_all (fun run -> run = []) runs
-      && legacy = []
-      && String.equal command default_coverage_command
-    then (
-      prerr_endline "crapper: no coverage data yet; forcing a full test run";
-      let dir = List.hd dirs in
-      let bisect_prefix = Filename.concat (Sys.getcwd ()) dir in
-      let cmd =
-        Printf.sprintf
-          "BISECT_FILE=%s/bisect %s --force"
-          (Filename.quote bisect_prefix)
-          command
-      in
-      if Sys.command cmd <> 0
-      then prerr_endline "crapper: coverage command failed; functions are scored at 0%";
-      merge_runs [ parse_run dir ])
-    else merge_runs runs
+    match runs with
+    | [] -> legacy
+    | newest :: older -> merge_newest (newest :: (older @ [ legacy ]))
   in
   (* keep the newest runs only *)
   List.iteri (fun i dir -> if i >= keep_runs then remove_dir dir) dirs;

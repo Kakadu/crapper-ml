@@ -2,7 +2,15 @@ A small dune project is compiled in place, so the crapper sees real .cmt files.
 
   $ dune build
 
-  $ ../crapper.exe .
+By default the coverage command is not run; without coverage data
+everything is N/A:
+
+  $ ../crapper.exe . | grep complex
+  complex                        Foo                                    8     N/A      N/A
+
+The user runs the coverage explicitly:
+
+  $ ../crapper.exe --run-coverage .
   CRAP Report
   ===========
   Languages: OCaml
@@ -24,10 +32,9 @@ A small dune project is compiled in place, so the crapper sees real .cmt files.
   get                            Foo.counter                            1  100.0%      1.0
   
 
-
-  $ ../crapper.exe --use-existing-coverage --threshold 71 . > /dev/null
+  $ ../crapper.exe --threshold 71 . > /dev/null
   [2]
-  $ ../crapper.exe --use-existing-coverage --threshold 72 . > /dev/null
+  $ ../crapper.exe --threshold 72 . > /dev/null
 
   $ ../crapper.exe --no-coverage . | grep complex
   complex                        Foo                                    8     N/A      N/A

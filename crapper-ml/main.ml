@@ -3,7 +3,7 @@
 open Crapper_ml
 
 let no_coverage = ref false
-let use_existing_coverage = ref false
+let run_coverage = ref false
 let no_match_cases = ref false
 let threshold = ref None
 let coverage_command = ref None
@@ -17,12 +17,15 @@ let () =
        [ ( "--no-coverage"
          , Arg.Set no_coverage
          , " complexity only; coverage and CRAP are N/A" )
-       ; ( "--use-existing-coverage"
-         , Arg.Set use_existing_coverage
-         , " read coverage reports already on disk" )
+       ; ( "--run-coverage"
+         , Arg.Set run_coverage
+         , " run the default coverage command before analyzing" )
        ; ( "--coverage-command"
-         , Arg.String (fun s -> coverage_command := Some s)
-         , "CMD replace the default coverage command with one of your own" )
+         , Arg.String
+             (fun s ->
+               coverage_command := Some s;
+               run_coverage := true)
+         , "CMD run this coverage command before analyzing" )
        ; ( "--no-match-cases"
          , Arg.Set no_match_cases
          , " match/function/try cases are not counted as decisions" )
@@ -55,17 +58,22 @@ let () =
         cmts
     in
     let entries =
+      let run = !run_coverage in
+      let command =
+        match !coverage_command with
+        | Some cmd -> Some cmd
+        | None -> if run then Some Coverage.default_coverage_command else None
+      in
+      (* No coverage command requested: read what is on disk. No data at all
+         means no measurement happened, so everything is N/A *)
       let coverage =
         if !no_coverage
         then None
-        else
-          Some
-            (Coverage.load
-               ~use_existing:!use_existing_coverage
-               ~command:
-                 (match !coverage_command with
-                  | Some cmd -> cmd
-                  | None -> Coverage.default_coverage_command))
+        else (
+          let data = Coverage.load ~run ~command in
+          match data with
+          | [] -> None
+          | _ -> Some data)
       in
       let coverage_of f =
         match coverage with
