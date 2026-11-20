@@ -5,6 +5,8 @@ One run discovers the compiled modules of a dune
 project, applies the language's complexity and coverage rules, and prints the
 report.
 
+It is an LLM clone of https://github.com/unclebob/crapper but for OCaml.
+
 The formula is the one from
 [crap4clj](https://github.com/unclebob/crap4clj),
 [crap4java](https://github.com/unclebob/crap4java), and
