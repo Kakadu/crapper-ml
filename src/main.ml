@@ -48,6 +48,31 @@ let () =
     | [] -> Discover.default_roots
     | roots -> roots
   in
+  (* The coverage command runs first: it may rebuild the project and with it
+     the .cmt files the extraction is about to read *)
+  let coverage =
+    if !no_coverage
+    then None
+    else (
+      let data =
+        Coverage.load
+          ~run:!run_coverage
+          ~command:
+            (match !coverage_command with
+             | Some cmd -> Some cmd
+             | None ->
+               if !run_coverage then Some Coverage.default_coverage_command else None)
+          ~path:!coverage_path
+      in
+      match data with
+      | [] -> None
+      | _ -> Some data)
+  in
+  let coverage_of f =
+    match coverage with
+    | None -> None
+    | Some data -> Coverage.coverage_of f data
+  in
   let cmts = Discover.discover_cmt roots in
   if cmts = []
   then print_endline "No .cmt files found. Is the project compiled?"
@@ -63,31 +88,6 @@ let () =
         cmts
     in
     let entries =
-      (* No coverage command requested: read what is on disk. No data at all
-         means no measurement happened, so everything is N/A *)
-      let coverage =
-        if !no_coverage
-        then None
-        else (
-          let data =
-            Coverage.load
-              ~run:!run_coverage
-              ~command:
-                (match !coverage_command with
-                 | Some cmd -> Some cmd
-                 | None ->
-                   if !run_coverage then Some Coverage.default_coverage_command else None)
-              ~path:!coverage_path
-          in
-          match data with
-          | [] -> None
-          | _ -> Some data)
-      in
-      let coverage_of f =
-        match coverage with
-        | None -> None
-        | Some data -> Coverage.coverage_of f data
-      in
       functions
       |> List.map (fun f -> Crap.make_entry ~coverage:(coverage_of f) f)
       |> Crap.sort_entries
