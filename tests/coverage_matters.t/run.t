@@ -12,7 +12,7 @@ is fully exercised. Identical complexity, very different CRAP scores.
   ===========
   Languages: OCaml
   
-  Function                       Namespace                             CC    Cov%     CRAP
+  Function                       Module                                CC    Cov%     CRAP
   ----------------------------------------------------------------------------------------
   complex                        Cm                                     8    0.0%     72.0
   complex_copy                   Cm                                     8   90.0%      8.1
@@ -27,9 +27,9 @@ Rows below a requested score can be omitted; N/A rows follow them out:
   $ ../crapper.exe --min-crap 30 .
   CRAP Report
   ===========
-  Languages: ocaml
+  Languages: OCaml
   
-  Function                       Namespace                             CC    Cov%     CRAP
+  Function                       Module                                CC    Cov%     CRAP
   ----------------------------------------------------------------------------------------
   complex                        Cm                                     8    0.0%     72.0
   
@@ -37,8 +37,9 @@ Rows below a requested score can be omitted; N/A rows follow them out:
   $ ../crapper.exe --min-crap 100 .
   CRAP Report
   ===========
-  Function                       Namespace                             CC    Cov%     CRAP
+  Function                       Module                                CC    Cov%     CRAP
   ----------------------------------------------------------------------------------------
+  
 
   $ ../crapper.exe --no-match-cases . | grep complex
   complex                        Cm                                     5    0.0%     30.0

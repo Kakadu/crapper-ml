@@ -85,7 +85,7 @@ Makefile's coverage target, simply override the inherited value).
 The report is printed on stdout, worst score first:
 
 ```text
-Function                       Namespace                             CC    Cov%     CRAP
+Function                       Module                                CC    Cov%     CRAP
 ----------------------------------------------------------------------------------------
 complex                        Foo                                    8    0.0%     72.0
 loops                          Foo                                    3  100.0%      3.0

@@ -15,7 +15,7 @@ The user runs the coverage explicitly:
   ===========
   Languages: OCaml
   
-  Function                       Namespace                             CC    Cov%     CRAP
+  Function                       Module                                CC    Cov%     CRAP
   ----------------------------------------------------------------------------------------
   complex                        Foo                                    8    0.0%     72.0
   g                              Foo                                    4    0.0%     20.0
