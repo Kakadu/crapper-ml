@@ -96,7 +96,9 @@ loops                          Foo                                    3  100.0% 
 Rows without a score follow scored rows, ordered by descending complexity.
 `--min-crap N` omits functions with a lower score; N/A rows are dropped as
 well. `--ignore-modules Foo,Foo.Bar` omits the functions of the named
-modules and their submodules. `--threshold N` exits with code 2 when the worst score is higher.
+modules and their submodules. Functions wrapped in bisect_ppx's
+[@coverage off] / [@@@coverage off] markers are omitted by default;
+--show-coverage-off prints them as well. `--threshold N` exits with code 2 when the worst score is higher.
 
 ## Development
 

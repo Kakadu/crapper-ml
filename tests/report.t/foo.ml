@@ -43,3 +43,11 @@ let g x =
   match x with
   | y when y > 0 -> y
   | _ -> 0
+
+[@@@coverage off]
+
+let omitted_by_marker a = if a then 1 else 2
+
+[@@@coverage on]
+
+let visible a = if a then 3 else 4

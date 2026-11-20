@@ -3,6 +3,7 @@
 open Crapper_ml
 
 let no_coverage = ref false
+let show_coverage_off = ref false
 let run_coverage = ref false
 let no_match_cases = ref false
 let threshold = ref None
@@ -47,6 +48,9 @@ let () =
                coverage_command := Some s;
                run_coverage := true)
          , "CMD run this coverage command before analyzing" )
+       ; ( "--show-coverage-off"
+         , Arg.Set show_coverage_off
+         , " print functions marked [@coverage off] as well" )
        ; ( "--min-crap"
          , Arg.Float (fun f -> min_crap := Some f)
          , "N omit functions with a CRAP score lower than N; N/A rows\n\
@@ -113,7 +117,12 @@ let () =
       let count_cases = not !no_match_cases in
       List.concat_map
         (fun cmt_path ->
-          try Crapper_ml.Extract.functions_of_cmt ~count_cases cmt_path with
+          try
+            Crapper_ml.Extract.functions_of_cmt
+              ~count_cases
+              ~omit_off:(not !show_coverage_off)
+              cmt_path
+          with
           | exn ->
             Crapper_ml.Extract.warn_broken_cmt cmt_path exn;
             [])

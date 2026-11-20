@@ -67,6 +67,44 @@ let resolve_source cmt_path (infos : Cmt_format.cmt_infos) =
     | None -> original source)
 ;;
 
+(* bisect_ppx's [@@@coverage off] / [@@@coverage on] markers: whether the
+   code being walked is instrumented at all. The state advances through the
+   structure items in source order. *)
+let coverage_state = ref true
+
+(* Whether the functions of the report should include code that bisect_ppx
+   does not instrument. Omitted by default. *)
+let omit_uninstrumented = ref true
+
+(* The [off] / [on] argument of a [@coverage ...] marker, if any *)
+let coverage_flag (attrs : Ppxlib.Parsetree.attributes) =
+  List.find_map
+    (fun (attr : Ppxlib.Parsetree.attribute) ->
+      match attr.attr_name.Location.txt with
+      | "coverage" ->
+        (match attr.attr_payload with
+         | PStr [ { pstr_desc = Pstr_eval (e, _); _ } ] ->
+           (match e.Ppxlib.Parsetree.pexp_desc with
+            | Pexp_ident { txt = Lident "off"; _ } -> Some false
+            | Pexp_ident { txt = Lident "on"; _ } -> Some true
+            | _ -> None)
+         | _ -> None)
+      | _ -> None)
+    attrs
+;;
+
+let update_coverage_state (attrs : Ppxlib.Parsetree.attributes) =
+  match coverage_flag attrs with
+  | Some state -> coverage_state := state
+  | None -> ()
+;;
+
+let instrumented binding_attrs binding_expr =
+  !coverage_state
+  && coverage_flag binding_attrs <> Some false
+  && coverage_flag binding_expr.Parsetree.pexp_attributes <> Some false
+;;
+
 (* The pattern of a [let] binding names the function: [f] in [let f x = ...],
    [(f, _) = ...] and so on. *)
 let rec pat_name (pat : Ppxlib.Parsetree.pattern) =
@@ -107,6 +145,9 @@ let rec add_structure namespace ~count_cases (str : Ppxlib.Parsetree.structure) 
 
 and add_structure_item namespace ~count_cases (item : Ppxlib.Parsetree.structure_item) acc
   =
+  (match item.Ppxlib.Parsetree.pstr_desc with
+   | Pstr_attribute attr -> update_coverage_state [ attr ]
+   | _ -> ());
   match item.Ppxlib.Parsetree.pstr_desc with
   | Pstr_value (_, bindings) ->
     List.fold_left
@@ -146,6 +187,13 @@ and add_module_expr namespace ~count_cases (me : Ppxlib.Parsetree.module_expr) a
   | _ -> acc
 
 and add_value_binding namespace ~count_cases vb acc =
+  if
+    !omit_uninstrumented
+    && not (instrumented vb.Ppxlib.Parsetree.pvb_attributes vb.Ppxlib.Parsetree.pvb_expr)
+  then acc
+  else add_value_binding_instrumented namespace ~count_cases vb acc
+
+and add_value_binding_instrumented namespace ~count_cases vb acc =
   let expr = vb.Ppxlib.Parsetree.pvb_expr in
   match expr.Ppxlib.Parsetree.pexp_desc with
   | Pexp_function _ | Pexp_fun _ ->
@@ -175,7 +223,9 @@ and add_class_expr namespace ~count_cases (ce : Ppxlib.Parsetree.class_expr) acc
   | _ -> acc
 
 and add_class_field namespace ~count_cases (cf : Ppxlib.Parsetree.class_field) acc =
-  match cf.Ppxlib.Parsetree.pcf_desc with
+  if !omit_uninstrumented && not !coverage_state
+  then acc
+  else match cf.Ppxlib.Parsetree.pcf_desc with
   | Pcf_method (name_loc, _, Cfk_concrete (_, expr)) ->
     make_function
       ~name:name_loc.Location.txt
@@ -204,7 +254,9 @@ let warn_broken_cmt cmt_path exn =
     (Printexc.to_string exn)
 ;;
 
-let functions_of_cmt ~count_cases cmt_path =
+let functions_of_cmt ~count_cases ~omit_off cmt_path =
+  coverage_state := true;
+  omit_uninstrumented := omit_off;
   let infos = Cmt_format.read_cmt cmt_path in
   let source = resolve_source cmt_path infos in
   (* dune's generated wrapper modules ([foo.ml-gen]) contain no user code *)

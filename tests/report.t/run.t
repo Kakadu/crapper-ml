@@ -21,6 +21,7 @@ The user runs the coverage explicitly:
   g                              Foo                                    4    0.0%     20.0
   andor                          Foo                                    3    0.0%     12.0
   guarded                        Foo                                    3    0.0%     12.0
+  visible                        Foo                                    2    0.0%      6.0
   loops                          Foo                                    3  100.0%      3.0
   odd                            Foo                                    2   66.7%      2.1
   even                           Foo                                    2  100.0%      2.0
@@ -35,6 +36,14 @@ The user runs the coverage explicitly:
   $ ../crapper.exe --threshold 71 . > /dev/null
   [2]
   $ ../crapper.exe --threshold 72 . > /dev/null
+
+Functions wrapped in [@coverage off] regions are omitted by default:
+
+  $ ../crapper.exe . | grep -c omitted || true
+  0
+
+  $ ../crapper.exe --show-coverage-off . | grep omitted_by_marker
+  omitted_by_marker              Foo                                    2    0.0%      6.0
 
 The coverage can also live in a directory of its own, next to other tools
 that produce [.coverage] files:
