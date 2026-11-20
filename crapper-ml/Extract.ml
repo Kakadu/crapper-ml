@@ -206,11 +206,15 @@ let warn_broken_cmt cmt_path exn =
 
 let functions_of_cmt ~count_cases cmt_path =
   let infos = Cmt_format.read_cmt cmt_path in
-  let namespace = namespace_root_of_cmt cmt_path in
   let source = resolve_source cmt_path infos in
-  let str = Pparse.parse_implementation ~tool_name:"crapper" source in
-  (* Translate the parsetree of the current compiler into the parsetree of
-     the current version of ppxlib *)
-  let str = Ppxlib.Selected_ast.of_ocaml Ppxlib.Selected_ast.Type.Structure str in
-  functions_of_structure namespace ~count_cases str source
+  (* dune's generated wrapper modules ([foo.ml-gen]) contain no user code *)
+  if Filename.check_suffix source ".ml-gen"
+  then []
+  else (
+    let namespace = namespace_root_of_cmt cmt_path in
+    let str = Pparse.parse_implementation ~tool_name:"crapper" source in
+    (* Translate the parsetree of the current compiler into the parsetree of
+       the current version of ppxlib *)
+    let str = Ppxlib.Selected_ast.of_ocaml Ppxlib.Selected_ast.Type.Structure str in
+    functions_of_structure namespace ~count_cases str source)
 ;;

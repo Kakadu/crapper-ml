@@ -6,7 +6,7 @@ is fully exercised. Identical complexity, very different CRAP scores.
   $ ../crapper.exe .
   CRAP Report
   ===========
-  Languages: ocaml
+  Languages: OCaml
   
   Function                       Namespace                             CC    Cov%     CRAP
   ----------------------------------------------------------------------------------------

@@ -3,9 +3,11 @@
     The [.coverage] files written by the bisect runtime are parsed directly:
     the [BISECT-COVERAGE-4] format is a length-prefixed, space-separated dump
     of every instrumented source file with the byte offsets of its points and
-    their visit counts. Multiple runs are merged by summing the counts. A
-    function is covered through its byte span in the source file: the same
-    offsets the extraction step recorded. *)
+    their visit counts.
+
+    Every invocation writes into its own run directory; within a run the
+    counts of concurrent test processes are summed, across runs a source
+    file is taken from the newest run that mentions it (see {!load}). *)
 
 type point =
   { offset : int
@@ -151,33 +153,136 @@ let coverage_of (f : Model.function_) (data : data) =
        Some (100.0 *. float_of_int hits /. float_of_int (List.length in_range)))
 ;;
 
-(* Directory where bisect writes its files and the runner keeps the
-   accumulated report. *)
+(* Directory where every crapper invocation gets its own run directory, so a
+   rerun of unchanged tests keeps the previous report valid: dune reruns a
+   test only when its sources changed, and a fresh run directory marks which
+   data is current. *)
 let coverage_dir = ".metrics/coverage"
-let default_coverage_command = "dune runtest --instrument-with bisect_ppx --force"
+let default_coverage_command = "dune runtest --instrument-with bisect_ppx"
 
-(* A fresh run deletes the previous report, like the reference crapper *)
-let prepare dir =
+(* Number of run directories kept on disk *)
+let keep_runs = 3
+
+let ensure_dir dir =
   let parent = Filename.dirname dir in
   if parent <> "." && not (Sys.file_exists parent) then Sys.mkdir parent 0o755;
-  if not (Sys.file_exists dir) then Sys.mkdir dir 0o755;
-  Sys.readdir dir
-  |> Array.to_list
-  |> List.filter (fun name -> Filename.check_suffix name ".coverage")
-  |> List.iter (fun name -> Sys.remove (Filename.concat dir name))
+  if not (Sys.file_exists dir) then Sys.mkdir dir 0o755
+;;
+
+let run_num dir =
+  let name = Filename.basename dir in
+  match String.index_opt name '-' with
+  | Some i ->
+    (try Some (int_of_string (String.sub name (i + 1) (String.length name - i - 1))) with
+     | _ -> None)
+  | None -> None
+;;
+
+(* newest run first *)
+let run_dirs root =
+  if Sys.file_exists root && Sys.is_directory root
+  then
+    Sys.readdir root
+    |> Array.to_list
+    |> List.filter (fun name ->
+      Filename.check_suffix name ".coverage" |> not
+      && String.starts_with ~prefix:"run-" name
+      && run_num (Filename.concat root name) <> None)
+    |> List.sort (fun a b ->
+      compare
+        (Option.get (run_num (Filename.concat root b)))
+        (Option.get (run_num (Filename.concat root a))))
+    |> List.map (Filename.concat root)
+  else []
+;;
+
+let rec remove_dir dir =
+  if Sys.is_directory dir
+  then (
+    Sys.readdir dir |> Array.iter (fun name -> remove_dir (Filename.concat dir name));
+    Unix.rmdir dir)
+  else Sys.remove dir
+;;
+
+(* Data of a single run: the [.coverage] files of concurrent test processes
+   describe the same point table and are summed. *)
+let parse_run dir =
+  collect dir |> List.map (fun path -> parse_file (read_file path)) |> merge
+;;
+
+(* Across runs the data of a source file is taken from the newest run that
+   mentions it: a changed source always gets a fresh run (dune reruns its
+   tests), an unchanged source keeps its valid older data. *)
+let merge_newest (runs : data list) : data =
+  let per_file = Hashtbl.create 17 in
+  List.iter
+    (List.iter (fun (filename, points) ->
+       if not (Hashtbl.mem per_file filename) then Hashtbl.add per_file filename points))
+    runs;
+  Hashtbl.fold (fun filename points acc -> (filename, points) :: acc) per_file []
 ;;
 
 let load ~use_existing ~command =
-  if not use_existing
-  then (
-    prepare coverage_dir;
-    (* absolute: test processes run inside dune's sandbox directories *)
-    let bisect_prefix = Filename.concat (Sys.getcwd ()) coverage_dir in
-    let cmd =
-      Printf.sprintf "BISECT_FILE=%s/bisect %s" (Filename.quote bisect_prefix) command
-    in
-    if Sys.command cmd <> 0
-    then prerr_endline "crapper: coverage command failed; functions are scored at 0%");
-  let data = collect coverage_dir |> List.map (fun path -> parse_file (read_file path)) in
-  merge data
+  let dirs = run_dirs coverage_dir in
+  let dirs =
+    if use_existing
+    then dirs
+    else (
+      ensure_dir coverage_dir;
+      let n =
+        match dirs with
+        | dir :: _ ->
+          (match run_num dir with
+           | Some n -> n + 1
+           | None -> 1)
+        | [] -> 1
+      in
+      let new_dir = Printf.sprintf "%s/run-%d" coverage_dir n in
+      ensure_dir new_dir;
+      (* absolute: test processes run inside dune's sandbox directories *)
+      let bisect_prefix = Filename.concat (Sys.getcwd ()) new_dir in
+      let cmd =
+        Printf.sprintf "BISECT_FILE=%s/bisect %s" (Filename.quote bisect_prefix) command
+      in
+      if Sys.command cmd <> 0
+      then prerr_endline "crapper: coverage command failed; functions are scored at 0%";
+      new_dir :: dirs)
+  in
+  (* [.coverage] files left directly in the coverage directory by older
+     versions are the oldest data *)
+  let legacy =
+    collect coverage_dir |> List.map (fun path -> parse_file (read_file path)) |> merge
+  in
+  let runs = dirs |> List.map parse_run in
+  let merge_runs runs =
+    match runs with
+    | [] -> []
+    | newest :: older -> merge_newest (newest :: (older @ [ legacy ]))
+  in
+  let data =
+    (* When nothing was rerun (a warm instrumented build and no coverage data
+       on disk), force one full instrumented test run *)
+    if
+      (not use_existing)
+      && List.for_all (fun run -> run = []) runs
+      && legacy = []
+      && String.equal command default_coverage_command
+    then (
+      prerr_endline "crapper: no coverage data yet; forcing a full test run";
+      let dir = List.hd dirs in
+      let bisect_prefix = Filename.concat (Sys.getcwd ()) dir in
+      let cmd =
+        Printf.sprintf
+          "BISECT_FILE=%s/bisect %s --force"
+          (Filename.quote bisect_prefix)
+          command
+      in
+      if Sys.command cmd <> 0
+      then prerr_endline "crapper: coverage command failed; functions are scored at 0%";
+      merge_runs [ parse_run dir ])
+    else merge_runs runs
+  in
+  (* keep the newest runs only *)
+  List.iteri (fun i dir -> if i >= keep_runs then remove_dir dir) dirs;
+  data
 ;;

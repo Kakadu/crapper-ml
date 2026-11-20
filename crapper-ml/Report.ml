@@ -27,7 +27,7 @@ let format_report entries =
   Buffer.add_string b "CRAP Report\n===========\n";
   (match entries with
    | [] -> ()
-   | _ -> Buffer.add_string b "Languages: ocaml\n\n");
+   | _ -> Buffer.add_string b "Languages: OCaml\n\n");
   Printf.bprintf
     b
     "%-*s %-*s %4s %7s %8s\n"

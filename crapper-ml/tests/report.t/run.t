@@ -5,7 +5,7 @@ A small dune project is compiled in place, so the crapper sees real .cmt files.
   $ ../crapper.exe .
   CRAP Report
   ===========
-  Languages: ocaml
+  Languages: OCaml
   
   Function                       Namespace                             CC    Cov%     CRAP
   ----------------------------------------------------------------------------------------

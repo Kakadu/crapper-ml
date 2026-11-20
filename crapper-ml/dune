@@ -6,10 +6,14 @@
 (library
  (name crapper_ml)
  (synopsis "CRAP metrics for OCaml functions")
- (libraries compiler-libs.common ppxlib)
- (modules Discover Model Crap Complexity Extract Report Coverage))
+ (libraries compiler-libs.common ppxlib unix)
+ (modules Discover Model Crap Complexity Extract Report Coverage)
+ (instrumentation
+  (backend bisect_ppx)))
 
 (executable
  (name main)
  (modules main)
- (libraries crapper_ml))
+ (libraries crapper_ml)
+ (instrumentation
+  (backend bisect_ppx)))
