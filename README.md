@@ -101,6 +101,6 @@ dune build
 dune test
 ```
 
-The cram tests in `src/tests/` compile small fixture dune projects in
+The cram tests in `tests/` compile small fixture dune projects in
 place, so every rule — extraction, complexity counting, coverage joining,
 threshold exit codes — is pinned against real `.cmt` and `.coverage` files.
