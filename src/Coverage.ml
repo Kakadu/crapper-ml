@@ -130,25 +130,24 @@ let sweep_into run_dir =
     List.mem name [ ".git"; ".hg"; ".metrics"; "node_modules"; "_opam" ]
     || (String.starts_with ~prefix:"." name && not (Filename.check_suffix name ".coverage"))
   in
-  let counter = ref 0 in
-  let rec walk path =
+  let rec collect path =
     if Sys.file_exists path && Sys.is_directory path
     then (
       let base = Filename.basename path in
       if base <> path && skip base
-      then ()
+      then []
       else
-        Array.iter
-          (fun name -> walk (Filename.concat path name))
-          (Sys.readdir path))
+        Array.to_list (Sys.readdir path)
+        |> List.concat_map (fun name -> collect (Filename.concat path name)))
     else if Filename.check_suffix (Filename.basename path) ".coverage"
-    then (
-      incr counter;
-      let target = Printf.sprintf "%s/collected_%04d.coverage" run_dir !counter in
-      (try Sys.rename path target with
-       | Sys_error msg -> prerr_endline ("crapper: " ^ msg)))
+    then [ path ]
+    else []
   in
-  walk "."
+  collect "."
+  |> List.iteri (fun i path ->
+         let target = Printf.sprintf "%s/collected_%04d.coverage" run_dir (i + 1) in
+         (try Sys.rename path target with
+          | Sys_error msg -> prerr_endline ("crapper: " ^ msg)))
 ;;
 
 let read_file path =
