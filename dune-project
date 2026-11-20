@@ -32,7 +32,8 @@
      (>= 5.5.0)
      (< 5.6.0))))
   dune-build-info
-  (bisect_ppx :with-dev-setup)
+  ppx_optcomp_nobase
+  (bisect_ppx_ng :with-dev-setup)
   (ocamlformat
    (and
     (= 0.27.0)
