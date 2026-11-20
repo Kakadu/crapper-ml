@@ -36,5 +36,19 @@ The user runs the coverage explicitly:
   [2]
   $ ../crapper.exe --threshold 72 . > /dev/null
 
+The coverage can also live in a directory of its own, next to other tools
+that produce [.coverage] files:
+
+  $ mkdir -p customcov && cp .metrics/coverage/run-1/*.coverage customcov/
+  $ ../crapper.exe --coverage-path customcov . | grep complex
+  complex                        Foo                                    8    0.0%     72.0
+
+A directory without any report is reported on stderr:
+
+  $ mkdir -p emptydir
+  $ ../crapper.exe --coverage-path emptydir . > /dev/null
+  crapper: no .coverage files in 'emptydir'
+  $ rm -rf customcov emptydir
+
   $ ../crapper.exe --no-coverage . | grep complex
   complex                        Foo                                    8     N/A      N/A

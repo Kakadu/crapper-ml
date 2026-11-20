@@ -7,6 +7,7 @@ let run_coverage = ref false
 let no_match_cases = ref false
 let threshold = ref None
 let coverage_command = ref None
+let coverage_path = ref None
 let roots = ref []
 let usage = "usage: crapper [options] [files-or-dirs]"
 
@@ -26,6 +27,10 @@ let () =
                coverage_command := Some s;
                run_coverage := true)
          , "CMD run this coverage command before analyzing" )
+       ; ( "--coverage-path"
+         , Arg.String (fun s -> coverage_path := Some s)
+         , "DIR read .coverage files from this directory instead of\n\
+           \        .metrics/coverage" )
        ; ( "--no-match-cases"
          , Arg.Set no_match_cases
          , " match/function/try cases are not counted as decisions" )
@@ -58,19 +63,22 @@ let () =
         cmts
     in
     let entries =
-      let run = !run_coverage in
-      let command =
-        match !coverage_command with
-        | Some cmd -> Some cmd
-        | None -> if run then Some Coverage.default_coverage_command else None
-      in
       (* No coverage command requested: read what is on disk. No data at all
          means no measurement happened, so everything is N/A *)
       let coverage =
         if !no_coverage
         then None
         else (
-          let data = Coverage.load ~run ~command in
+          let data =
+            Coverage.load
+              ~run:!run_coverage
+              ~command:
+                (match !coverage_command with
+                 | Some cmd -> Some cmd
+                 | None ->
+                   if !run_coverage then Some Coverage.default_coverage_command else None)
+              ~path:!coverage_path
+          in
           match data with
           | [] -> None
           | _ -> Some data)

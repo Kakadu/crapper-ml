@@ -105,6 +105,20 @@ let collect dir =
   else []
 ;;
 
+(* [BISECT-COVERAGE-4] files placed by other tools, like [make coverage]
+   writing into /tmp: every [.coverage] file below [dir] is a data point *)
+let rec collect_under path acc =
+  if not (Sys.file_exists path)
+  then acc
+  else if Sys.is_directory path
+  then
+    Sys.readdir path
+    |> Array.fold_left (fun acc name -> collect_under (Filename.concat path name) acc) acc
+  else if Filename.check_suffix (Filename.basename path) ".coverage"
+  then path :: acc
+  else acc
+;;
+
 let read_file path =
   let ic = open_in_bin path in
   let n = in_channel_length ic in
@@ -222,46 +236,66 @@ let merge_newest (runs : data list) : data =
   Hashtbl.fold (fun filename points acc -> (filename, points) :: acc) per_file []
 ;;
 
-(* [run] executes the coverage command into a fresh run directory; without it
-   the existing reports are used as they are. *)
-let load ~run ~command =
-  let dirs = run_dirs coverage_dir in
-  let dirs =
-    match run, command with
-    | true, Some command ->
-      ensure_dir coverage_dir;
-      let n =
-        match dirs with
-        | dir :: _ ->
-          (match run_num dir with
-           | Some n -> n + 1
-           | None -> 1)
-        | [] -> 1
-      in
-      let new_dir = Printf.sprintf "%s/run-%d" coverage_dir n in
-      ensure_dir new_dir;
-      (* absolute: test processes run inside dune's sandbox directories *)
-      let bisect_prefix = Filename.concat (Sys.getcwd ()) new_dir in
-      let cmd =
-        Printf.sprintf "BISECT_FILE=%s/bisect %s" (Filename.quote bisect_prefix) command
-      in
-      if Sys.command cmd <> 0
-      then prerr_endline "crapper: coverage command failed; functions are scored at 0%";
-      new_dir :: dirs
-    | _ -> dirs
-  in
-  (* [.coverage] files left directly in the coverage directory by older
-     versions are the oldest data *)
-  let legacy =
-    collect coverage_dir |> List.map (fun path -> parse_file (read_file path)) |> merge
-  in
-  let runs = dirs |> List.map parse_run in
-  let data =
-    match runs with
-    | [] -> legacy
-    | newest :: older -> merge_newest (newest :: (older @ [ legacy ]))
-  in
-  (* keep the newest runs only *)
-  List.iteri (fun i dir -> if i >= keep_runs then remove_dir dir) dirs;
-  data
+(* Runs the coverage command with BISECT_FILE pointing into [dir], so the
+   bisect runtime writes where the caller expects it. Commands that set
+   BISECT_FILE themselves (like the Makefile's [make coverage]) simply
+   override the inherited value. *)
+let execute_into dir = function
+  | None -> ()
+  | Some command ->
+    ensure_dir dir;
+    (* absolute: test processes run inside dune's sandbox directories *)
+    let bisect_prefix = Filename.concat (Sys.getcwd ()) dir in
+    let cmd =
+      Printf.sprintf "BISECT_FILE=%s/bisect %s" (Filename.quote bisect_prefix) command
+    in
+    if Sys.command cmd <> 0
+    then prerr_endline "crapper: coverage command failed; functions are scored at 0%"
+;;
+
+(* [run] executes the coverage command; without it the existing reports are
+   used as they are. [path] replaces the [.metrics/coverage] run directory
+   scheme entirely: a single directory owned by another tool (the Makefile's
+   [make coverage] writes [/tmp/zanudacov]), read as one summed dataset. *)
+let load ~run ~command ~path =
+  match path with
+  | Some dir ->
+    if run then execute_into dir command;
+    let files = collect_under dir [] in
+    if files = [] then Printf.eprintf "crapper: no .coverage files in '%s'\n%!" dir;
+    files |> List.map (fun p -> parse_file (read_file p)) |> merge
+  | None ->
+    let dirs = run_dirs coverage_dir in
+    let dirs =
+      match run, command with
+      | true, Some command ->
+        ensure_dir coverage_dir;
+        let n =
+          match dirs with
+          | dir :: _ ->
+            (match run_num dir with
+             | Some n -> n + 1
+             | None -> 1)
+          | [] -> 1
+        in
+        let new_dir = Printf.sprintf "%s/run-%d" coverage_dir n in
+        ensure_dir new_dir;
+        execute_into new_dir (Some command);
+        new_dir :: dirs
+      | _ -> dirs
+    in
+    (* [.coverage] files left directly in the coverage directory by older
+       versions are the oldest data *)
+    let legacy =
+      collect coverage_dir |> List.map (fun path -> parse_file (read_file path)) |> merge
+    in
+    let runs = dirs |> List.map parse_run in
+    let data =
+      match runs with
+      | [] -> legacy
+      | newest :: older -> merge_newest (newest :: (older @ [ legacy ]))
+    in
+    (* keep the newest runs only *)
+    List.iteri (fun i dir -> if i >= keep_runs then remove_dir dir) dirs;
+    data
 ;;
