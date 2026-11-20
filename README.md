@@ -17,13 +17,13 @@ CRAP = CC² × (1 − coverage)³ + CC
 `CC` is cyclomatic complexity. `coverage` is the fraction of the function
 exercised by tests.
 
-The tools mostly is LLM-generated.
+The tool is mostly LLM-generated.
 
 ## Run
 
 ```bash
-dune build crapper-ml/
-_build/default/crapper-ml/main.exe [options] [files-or-dirs]
+dune build
+dune exec crapper-ml -- [options] [files-or-dirs]
 ```
 
 The tool expects a compiled dune repository with all `.cmt` files in place.
@@ -101,6 +101,6 @@ dune build
 dune test
 ```
 
-The cram tests in `crapper-ml/tests/` compile small fixture dune projects in
+The cram tests in `src/tests/` compile small fixture dune projects in
 place, so every rule — extraction, complexity counting, coverage joining,
 threshold exit codes — is pinned against real `.cmt` and `.coverage` files.
